@@ -31,3 +31,6 @@
 ## Testing
 - [x] Write vitest tests for API endpoints
 - [ ] Write integration tests for bug report submission flow
+
+## Bug Fixes
+- [x] Fix html2canvas OKLCH color parsing error - make screenshot capture gracefully handle unsupported colors

@@ -294,7 +294,9 @@
           doCapture();
         };
         script.onerror = function() {
-          reject(new Error('Failed to load html2canvas'));
+          // If html2canvas fails to load, resolve with null (no screenshot)
+          console.warn('[BugCapture] Failed to load html2canvas, submitting without screenshot');
+          resolve(null);
         };
         document.head.appendChild(script);
       } else {
@@ -302,14 +304,50 @@
       }
 
       function doCapture() {
-        html2canvas(document.body, {
-          useCORS: true,
-          allowTaint: true,
-          logging: false,
-          scale: 1
-        }).then(function(canvas) {
-          resolve(canvas.toDataURL('image/png'));
-        }).catch(reject);
+        // Convert OKLCH colors to RGB before capturing to avoid html2canvas errors
+        var styleSheets = document.styleSheets;
+        var originalStyles = [];
+        
+        try {
+          // Try to capture with html2canvas
+          html2canvas(document.body, {
+            useCORS: true,
+            allowTaint: true,
+            logging: false,
+            scale: 1,
+            ignoreElements: function(element) {
+              // Ignore elements that might cause issues
+              return element.id === 'bug-capture-button' || element.id === 'bug-capture-overlay';
+            },
+            onclone: function(clonedDoc) {
+              // Remove problematic CSS that uses OKLCH
+              var allElements = clonedDoc.querySelectorAll('*');
+              allElements.forEach(function(el) {
+                var computedStyle = window.getComputedStyle(el);
+                // Apply computed RGB colors to override OKLCH
+                if (computedStyle.backgroundColor) {
+                  el.style.backgroundColor = computedStyle.backgroundColor;
+                }
+                if (computedStyle.color) {
+                  el.style.color = computedStyle.color;
+                }
+                if (computedStyle.borderColor) {
+                  el.style.borderColor = computedStyle.borderColor;
+                }
+              });
+            }
+          }).then(function(canvas) {
+            resolve(canvas.toDataURL('image/png'));
+          }).catch(function(error) {
+            console.warn('[BugCapture] Screenshot capture failed:', error.message);
+            // If screenshot fails, resolve with null instead of rejecting
+            // This allows the bug report to still be submitted without a screenshot
+            resolve(null);
+          });
+        } catch (error) {
+          console.warn('[BugCapture] Screenshot capture error:', error.message);
+          resolve(null);
+        }
       }
     });
   }
@@ -324,7 +362,6 @@
         title: options.title || 'Bug Report',
         description: options.description || '',
         pageUrl: window.location.href,
-        screenshot: screenshot,
         consoleLogs: consoleLogs.slice(),
         networkLogs: networkLogs.slice(),
         userActions: userActions.slice(),
@@ -332,6 +369,11 @@
         reporterEmail: options.reporterEmail,
         reporterName: options.reporterName
       };
+
+      // Only include screenshot if it was captured successfully
+      if (screenshot) {
+        data.screenshot = screenshot;
+      }
 
       return fetch(config.apiEndpoint + '/api/trpc/bugReports.submit', {
         method: 'POST',
