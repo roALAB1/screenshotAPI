@@ -35,3 +35,4 @@
 ## Bug Fixes
 - [x] Fix html2canvas OKLCH color parsing error - make screenshot capture gracefully handle unsupported colors
 - [x] Fix 'Failed to fetch' error in bug report submission - ensure CORS and error handling work properly
+- [x] Remove login/authentication requirement - make all features work without user auth

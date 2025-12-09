@@ -1,4 +1,3 @@
-import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,21 +10,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { getLoginUrl } from "@/const";
-import { Bug, ArrowLeft, Copy, Code, Zap, Settings } from "lucide-react";
+import { ArrowLeft, Copy, Code, Zap, Settings } from "lucide-react";
 import { Link, useSearch } from "wouter";
 import { useState } from "react";
 import { toast } from "sonner";
 
 export default function Integration() {
-  const { loading: authLoading, isAuthenticated } = useAuth();
   const searchString = useSearch();
   const searchParams = new URLSearchParams(searchString);
   const projectKeyParam = searchParams.get("projectKey");
 
-  const { data: projects, isLoading } = trpc.projects.list.useQuery(undefined, {
-    enabled: isAuthenticated,
-  });
+  const { data: projects, isLoading } = trpc.projects.list.useQuery();
 
   const [selectedProjectKey, setSelectedProjectKey] = useState(projectKeyParam || "");
 
@@ -107,36 +102,6 @@ fetch("${apiEndpoint}/api/trpc/bugReports.submit", {
   headers: { "Content-Type": "application/json" },
   body: JSON.stringify({ json: captureData }),
 });`;
-
-  if (authLoading) {
-    return (
-      <div className="min-h-screen bg-gray-50 p-8">
-        <div className="max-w-4xl mx-auto">
-          <Skeleton className="h-8 w-48 mb-8" />
-          <Skeleton className="h-96" />
-        </div>
-      </div>
-    );
-  }
-
-  if (!isAuthenticated) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <Card className="w-full max-w-md">
-          <CardHeader className="text-center">
-            <Bug className="w-12 h-12 mx-auto mb-4 text-primary" />
-            <CardTitle>Sign In Required</CardTitle>
-            <CardDescription>Please sign in to view integration guide</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button asChild className="w-full">
-              <a href={getLoginUrl()}>Sign In</a>
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-gray-50">

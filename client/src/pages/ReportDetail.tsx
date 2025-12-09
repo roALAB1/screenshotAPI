@@ -1,7 +1,6 @@
-import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -13,7 +12,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { getLoginUrl } from "@/const";
 import {
   Bug,
   ArrowLeft,
@@ -63,14 +61,13 @@ const consoleColors = {
 };
 
 export default function ReportDetail() {
-  const { loading: authLoading, isAuthenticated } = useAuth();
   const params = useParams<{ id: string }>();
   const reportId = parseInt(params.id || "0");
   const utils = trpc.useUtils();
 
   const { data: report, isLoading } = trpc.bugReports.get.useQuery(
     { id: reportId },
-    { enabled: isAuthenticated && reportId > 0 }
+    { enabled: reportId > 0 }
   );
 
   const updateReport = trpc.bugReports.update.useMutation({
@@ -83,32 +80,13 @@ export default function ReportDetail() {
     },
   });
 
-  if (authLoading || isLoading) {
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 p-8">
         <div className="max-w-6xl mx-auto">
           <Skeleton className="h-8 w-48 mb-8" />
           <Skeleton className="h-96" />
         </div>
-      </div>
-    );
-  }
-
-  if (!isAuthenticated) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <Card className="w-full max-w-md">
-          <CardHeader className="text-center">
-            <Bug className="w-12 h-12 mx-auto mb-4 text-primary" />
-            <CardTitle>Sign In Required</CardTitle>
-            <CardDescription>Please sign in to view this report</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button asChild className="w-full">
-              <a href={getLoginUrl()}>Sign In</a>
-            </Button>
-          </CardContent>
-        </Card>
       </div>
     );
   }

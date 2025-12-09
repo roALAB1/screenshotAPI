@@ -1,57 +1,14 @@
-import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { getLoginUrl } from "@/const";
 import { Bug, FolderOpen, AlertCircle, CheckCircle, Clock, Plus, Settings } from "lucide-react";
 import { Link } from "wouter";
 
 export default function Dashboard() {
-  const { user, loading: authLoading, isAuthenticated } = useAuth();
-  const { data: stats, isLoading: statsLoading } = trpc.bugReports.stats.useQuery(undefined, {
-    enabled: isAuthenticated,
-  });
-  const { data: projectsList, isLoading: projectsLoading } = trpc.projects.list.useQuery(undefined, {
-    enabled: isAuthenticated,
-  });
-
-  if (authLoading) {
-    return (
-      <div className="min-h-screen bg-gray-50 p-8">
-        <div className="max-w-7xl mx-auto">
-          <Skeleton className="h-8 w-48 mb-8" />
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-            {[1, 2, 3, 4].map((i) => (
-              <Skeleton key={i} className="h-32" />
-            ))}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (!isAuthenticated) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <Card className="w-full max-w-md">
-          <CardHeader className="text-center">
-            <Bug className="w-12 h-12 mx-auto mb-4 text-primary" />
-            <CardTitle>Bug Capture Tool</CardTitle>
-            <CardDescription>
-              Capture screenshots, console logs, and network traffic for debugging
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button asChild className="w-full">
-              <a href={getLoginUrl()}>Sign In to Continue</a>
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
+  const { data: stats, isLoading: statsLoading } = trpc.bugReports.stats.useQuery();
+  const { data: projectsList, isLoading: projectsLoading } = trpc.projects.list.useQuery();
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -64,7 +21,6 @@ export default function Dashboard() {
               <h1 className="text-xl font-semibold">Bug Capture Tool</h1>
             </div>
             <div className="flex items-center gap-4">
-              <span className="text-sm text-gray-600">Welcome, {user?.name || "User"}</span>
               <Button variant="outline" size="sm" asChild>
                 <Link href="/projects">
                   <FolderOpen className="w-4 h-4 mr-2" />

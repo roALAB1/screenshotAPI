@@ -1,4 +1,3 @@
-import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -25,19 +24,15 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { getLoginUrl } from "@/const";
-import { Bug, FolderOpen, Plus, Copy, Trash2, ArrowLeft, Key } from "lucide-react";
+import { FolderOpen, Plus, Copy, Trash2, ArrowLeft, Key } from "lucide-react";
 import { Link } from "wouter";
 import { useState } from "react";
 import { toast } from "sonner";
 
 export default function Projects() {
-  const { user, loading: authLoading, isAuthenticated } = useAuth();
   const utils = trpc.useUtils();
   
-  const { data: projects, isLoading } = trpc.projects.list.useQuery(undefined, {
-    enabled: isAuthenticated,
-  });
+  const { data: projects, isLoading } = trpc.projects.list.useQuery();
 
   const createProject = trpc.projects.create.useMutation({
     onSuccess: () => {
@@ -82,40 +77,6 @@ export default function Projects() {
     navigator.clipboard.writeText(key);
     toast.success("Project key copied to clipboard");
   };
-
-  if (authLoading) {
-    return (
-      <div className="min-h-screen bg-gray-50 p-8">
-        <div className="max-w-4xl mx-auto">
-          <Skeleton className="h-8 w-48 mb-8" />
-          <div className="space-y-4">
-            {[1, 2, 3].map((i) => (
-              <Skeleton key={i} className="h-32" />
-            ))}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (!isAuthenticated) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <Card className="w-full max-w-md">
-          <CardHeader className="text-center">
-            <Bug className="w-12 h-12 mx-auto mb-4 text-primary" />
-            <CardTitle>Sign In Required</CardTitle>
-            <CardDescription>Please sign in to manage your projects</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button asChild className="w-full">
-              <a href={getLoginUrl()}>Sign In</a>
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-gray-50">

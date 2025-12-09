@@ -1,7 +1,5 @@
-import { COOKIE_NAME } from "@shared/const";
-import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
-import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
+import { publicProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import { db } from "./db";
 import { bugReports, projects } from "../drizzle/schema";
@@ -52,26 +50,25 @@ const deviceInfoSchema = z.object({
   cookiesEnabled: z.boolean(),
 });
 
-// Project router
+// Project router - no auth required
 const projectRouter = router({
-  // List all projects for the current user
-  list: protectedProcedure.query(async ({ ctx }) => {
+  // List all projects
+  list: publicProcedure.query(async () => {
     const result = await db
       .select()
       .from(projects)
-      .where(eq(projects.ownerId, ctx.user.id))
       .orderBy(desc(projects.createdAt));
     return result;
   }),
 
   // Get a single project by ID
-  get: protectedProcedure
+  get: publicProcedure
     .input(z.object({ id: z.number() }))
-    .query(async ({ ctx, input }) => {
+    .query(async ({ input }) => {
       const [project] = await db
         .select()
         .from(projects)
-        .where(and(eq(projects.id, input.id), eq(projects.ownerId, ctx.user.id)));
+        .where(eq(projects.id, input.id));
       
       if (!project) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Project not found" });
@@ -95,7 +92,7 @@ const projectRouter = router({
     }),
 
   // Create a new project
-  create: protectedProcedure
+  create: publicProcedure
     .input(
       z.object({
         name: z.string().min(1).max(255),
@@ -103,21 +100,21 @@ const projectRouter = router({
         urlPattern: z.string().optional(),
       })
     )
-    .mutation(async ({ ctx, input }) => {
+    .mutation(async ({ input }) => {
       const projectKey = nanoid(12);
       const [result] = await db.insert(projects).values({
         projectKey,
         name: input.name,
         description: input.description || null,
         urlPattern: input.urlPattern || null,
-        ownerId: ctx.user.id,
+        ownerId: 1, // Default owner since no auth
       });
       
       return { id: result.insertId, projectKey };
     }),
 
   // Update a project
-  update: protectedProcedure
+  update: publicProcedure
     .input(
       z.object({
         id: z.number(),
@@ -126,14 +123,13 @@ const projectRouter = router({
         urlPattern: z.string().optional(),
       })
     )
-    .mutation(async ({ ctx, input }) => {
+    .mutation(async ({ input }) => {
       const { id, ...updates } = input;
       
-      // Verify ownership
       const [project] = await db
         .select()
         .from(projects)
-        .where(and(eq(projects.id, id), eq(projects.ownerId, ctx.user.id)));
+        .where(eq(projects.id, id));
       
       if (!project) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Project not found" });
@@ -148,14 +144,13 @@ const projectRouter = router({
     }),
 
   // Delete a project
-  delete: protectedProcedure
+  delete: publicProcedure
     .input(z.object({ id: z.number() }))
-    .mutation(async ({ ctx, input }) => {
-      // Verify ownership
+    .mutation(async ({ input }) => {
       const [project] = await db
         .select()
         .from(projects)
-        .where(and(eq(projects.id, input.id), eq(projects.ownerId, ctx.user.id)));
+        .where(eq(projects.id, input.id));
       
       if (!project) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Project not found" });
@@ -171,10 +166,10 @@ const projectRouter = router({
     }),
 });
 
-// Bug report router
+// Bug report router - no auth required
 const bugReportRouter = router({
   // List bug reports with filtering
-  list: protectedProcedure
+  list: publicProcedure
     .input(
       z.object({
         projectId: z.number().optional(),
@@ -185,21 +180,9 @@ const bugReportRouter = router({
         offset: z.number().min(0).default(0),
       })
     )
-    .query(async ({ ctx, input }) => {
-      // Get user's projects
-      const userProjects = await db
-        .select({ id: projects.id })
-        .from(projects)
-        .where(eq(projects.ownerId, ctx.user.id));
-      
-      const projectIds = userProjects.map((p) => p.id);
-      
-      if (projectIds.length === 0) {
-        return { reports: [], total: 0 };
-      }
-
+    .query(async ({ input }) => {
       // Build conditions
-      const conditions = [sql`${bugReports.projectId} IN (${sql.join(projectIds.map(id => sql`${id}`), sql`, `)})`];
+      const conditions = [];
       
       if (input.projectId) {
         conditions.push(eq(bugReports.projectId, input.projectId));
@@ -239,9 +222,9 @@ const bugReportRouter = router({
     }),
 
   // Get a single bug report
-  get: protectedProcedure
+  get: publicProcedure
     .input(z.object({ id: z.number() }))
-    .query(async ({ ctx, input }) => {
+    .query(async ({ input }) => {
       const [report] = await db
         .select()
         .from(bugReports)
@@ -249,16 +232,6 @@ const bugReportRouter = router({
       
       if (!report) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Bug report not found" });
-      }
-
-      // Verify user has access to this project
-      const [project] = await db
-        .select()
-        .from(projects)
-        .where(and(eq(projects.id, report.projectId), eq(projects.ownerId, ctx.user.id)));
-      
-      if (!project) {
-        throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
       }
 
       return report;
@@ -333,7 +306,7 @@ const bugReportRouter = router({
     }),
 
   // Update bug report status/priority
-  update: protectedProcedure
+  update: publicProcedure
     .input(
       z.object({
         id: z.number(),
@@ -342,10 +315,9 @@ const bugReportRouter = router({
         title: z.string().max(255).optional(),
       })
     )
-    .mutation(async ({ ctx, input }) => {
+    .mutation(async ({ input }) => {
       const { id, ...updates } = input;
 
-      // Get the report
       const [report] = await db
         .select()
         .from(bugReports)
@@ -353,16 +325,6 @@ const bugReportRouter = router({
       
       if (!report) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Bug report not found" });
-      }
-
-      // Verify user has access
-      const [project] = await db
-        .select()
-        .from(projects)
-        .where(and(eq(projects.id, report.projectId), eq(projects.ownerId, ctx.user.id)));
-      
-      if (!project) {
-        throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
       }
 
       await db
@@ -374,10 +336,9 @@ const bugReportRouter = router({
     }),
 
   // Delete a bug report
-  delete: protectedProcedure
+  delete: publicProcedure
     .input(z.object({ id: z.number() }))
-    .mutation(async ({ ctx, input }) => {
-      // Get the report
+    .mutation(async ({ input }) => {
       const [report] = await db
         .select()
         .from(bugReports)
@@ -387,44 +348,13 @@ const bugReportRouter = router({
         throw new TRPCError({ code: "NOT_FOUND", message: "Bug report not found" });
       }
 
-      // Verify user has access
-      const [project] = await db
-        .select()
-        .from(projects)
-        .where(and(eq(projects.id, report.projectId), eq(projects.ownerId, ctx.user.id)));
-      
-      if (!project) {
-        throw new TRPCError({ code: "FORBIDDEN", message: "Access denied" });
-      }
-
       await db.delete(bugReports).where(eq(bugReports.id, input.id));
       
       return { success: true };
     }),
 
   // Get stats for dashboard
-  stats: protectedProcedure.query(async ({ ctx }) => {
-    // Get user's projects
-    const userProjects = await db
-      .select({ id: projects.id })
-      .from(projects)
-      .where(eq(projects.ownerId, ctx.user.id));
-    
-    const projectIds = userProjects.map((p) => p.id);
-    
-    if (projectIds.length === 0) {
-      return {
-        total: 0,
-        new: 0,
-        inProgress: 0,
-        resolved: 0,
-        closed: 0,
-        byPriority: { low: 0, medium: 0, high: 0, critical: 0 },
-      };
-    }
-
-    const inClause = sql`${bugReports.projectId} IN (${sql.join(projectIds.map(id => sql`${id}`), sql`, `)})`;
-
+  stats: publicProcedure.query(async () => {
     const [statusCounts, priorityCounts] = await Promise.all([
       db
         .select({
@@ -432,7 +362,6 @@ const bugReportRouter = router({
           count: sql<number>`COUNT(*)`,
         })
         .from(bugReports)
-        .where(inClause)
         .groupBy(bugReports.status),
       db
         .select({
@@ -440,7 +369,6 @@ const bugReportRouter = router({
           count: sql<number>`COUNT(*)`,
         })
         .from(bugReports)
-        .where(inClause)
         .groupBy(bugReports.priority),
     ]);
 
@@ -469,16 +397,6 @@ const bugReportRouter = router({
 
 export const appRouter = router({
   system: systemRouter,
-  auth: router({
-    me: publicProcedure.query((opts) => opts.ctx.user),
-    logout: publicProcedure.mutation(({ ctx }) => {
-      const cookieOptions = getSessionCookieOptions(ctx.req);
-      ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
-      return {
-        success: true,
-      } as const;
-    }),
-  }),
   projects: projectRouter,
   bugReports: bugReportRouter,
 });

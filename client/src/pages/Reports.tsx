@@ -1,7 +1,6 @@
-import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -12,7 +11,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { getLoginUrl } from "@/const";
 import { Bug, ArrowLeft, Search, ExternalLink, Monitor, Globe, Clock } from "lucide-react";
 import { Link, useSearch } from "wouter";
 import { useState, useMemo } from "react";
@@ -32,7 +30,6 @@ const priorityColors = {
 };
 
 export default function Reports() {
-  const { loading: authLoading, isAuthenticated } = useAuth();
   const searchString = useSearch();
   const searchParams = new URLSearchParams(searchString);
   const projectIdParam = searchParams.get("projectId");
@@ -46,62 +43,21 @@ export default function Reports() {
   const [page, setPage] = useState(0);
   const limit = 20;
 
-  const { data: projects } = trpc.projects.list.useQuery(undefined, {
-    enabled: isAuthenticated,
-  });
+  const { data: projects } = trpc.projects.list.useQuery();
 
-  const { data, isLoading } = trpc.bugReports.list.useQuery(
-    {
-      projectId: filters.projectId,
-      status: filters.status,
-      priority: filters.priority,
-      search: filters.search || undefined,
-      limit,
-      offset: page * limit,
-    },
-    {
-      enabled: isAuthenticated,
-    }
-  );
+  const { data, isLoading } = trpc.bugReports.list.useQuery({
+    projectId: filters.projectId,
+    status: filters.status,
+    priority: filters.priority,
+    search: filters.search || undefined,
+    limit,
+    offset: page * limit,
+  });
 
   const totalPages = useMemo(() => {
     if (!data?.total) return 0;
     return Math.ceil(data.total / limit);
   }, [data?.total]);
-
-  if (authLoading) {
-    return (
-      <div className="min-h-screen bg-gray-50 p-8">
-        <div className="max-w-6xl mx-auto">
-          <Skeleton className="h-8 w-48 mb-8" />
-          <div className="space-y-4">
-            {[1, 2, 3].map((i) => (
-              <Skeleton key={i} className="h-32" />
-            ))}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (!isAuthenticated) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <Card className="w-full max-w-md">
-          <CardHeader className="text-center">
-            <Bug className="w-12 h-12 mx-auto mb-4 text-primary" />
-            <CardTitle>Sign In Required</CardTitle>
-            <CardDescription>Please sign in to view bug reports</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button asChild className="w-full">
-              <a href={getLoginUrl()}>Sign In</a>
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-gray-50">
