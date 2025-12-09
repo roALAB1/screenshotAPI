@@ -375,15 +375,40 @@
         data.screenshot = screenshot;
       }
 
-      return fetch(config.apiEndpoint + '/api/trpc/bugReports.submit', {
+      // Ensure API endpoint is properly configured
+      var endpoint = config.apiEndpoint;
+      if (!endpoint) {
+        console.error('[BugCapture] API endpoint not configured');
+        return Promise.reject(new Error('API endpoint not configured. Please set apiEndpoint in BugCapture.init()'));
+      }
+
+      // Remove trailing slash if present
+      endpoint = endpoint.replace(/\/$/, '');
+
+      return fetch(endpoint + '/api/trpc/bugReports.submit', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
+        mode: 'cors',
         body: JSON.stringify({ json: data })
       }).then(function(response) {
+        if (!response.ok) {
+          return response.text().then(function(text) {
+            throw new Error('Server error: ' + response.status + ' - ' + text);
+          });
+        }
         return response.json();
+      }).then(function(result) {
+        // Check for tRPC error format
+        if (result.error) {
+          throw new Error(result.error.message || 'Server returned an error');
+        }
+        return result;
       });
+    }).catch(function(error) {
+      console.error('[BugCapture] Submit error:', error);
+      throw error;
     });
   }
 
